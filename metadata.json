@@ -1,0 +1,10 @@
+{
+  "name": "TruthLens AI - Multimodal Misinformation Screening",
+  "description": "See it. Hear it. Verify it. An accessible multimodal misinformation screening and verification assistant analyzing text, images, and voice with evidence checking and risk scoring.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
