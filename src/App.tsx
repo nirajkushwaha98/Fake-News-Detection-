@@ -19,6 +19,7 @@ import {
 import {
   analyzeLinguistics,
   extractClaim,
+  extractSearchQuery,
   computeRiskScore,
   buildReadAloudScript
 } from './utils/nlpEngine';
@@ -194,13 +195,32 @@ export default function App() {
       // Step 1: Linguistic Analysis
       const linguistic = analyzeLinguistics(text);
 
-      // Step 2: Claim Extraction
+      // Step 2: Claim Extraction & Refined Search Query
       const claim = extractClaim(text);
+      const searchQuery = extractSearchQuery(text);
 
-      // Step 3: Live Evidence Cross-Check
-      const evidenceResult = await searchRelatedEvidence(claim);
+      // Step 3: Live Evidence Cross-Check (Wikipedia Search)
+      const evidenceResult = await searchRelatedEvidence(claim, searchQuery);
 
-      // Step 4: Compute Transparent Risk Score
+      // Step 4: Check if server-side AI deep verification is available
+      let deepAIResult: any = null;
+      try {
+        const aiRes = await fetch('/api/verify-deep', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, inputType })
+        });
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          if (aiData.hasAI && aiData.result && typeof aiData.result.riskScore === 'number') {
+            deepAIResult = aiData.result;
+          }
+        }
+      } catch (e) {
+        // Fall back to local engine
+      }
+
+      // Step 5: Compute Transparent Risk Score
       const riskCalculation = computeRiskScore(
         linguistic,
         evidenceResult.items,
@@ -209,18 +229,38 @@ export default function App() {
         text
       );
 
-      // Step 5: Construct Unified Result Object
+      // If deep AI is available, blend / enrich
+      const finalRiskScore = deepAIResult ? deepAIResult.riskScore : riskCalculation.riskScore;
+      const finalAssessment = deepAIResult ? deepAIResult.assessment : riskCalculation.assessment;
+      const finalLevel = finalRiskScore <= 30 ? 'LOW' : finalRiskScore <= 60 ? 'MEDIUM' : 'HIGH';
+
+      const finalReasons = deepAIResult?.reasons?.length
+        ? deepAIResult.reasons
+        : riskCalculation.whyReasons;
+
+      const finalGuidance = deepAIResult?.actionableGuidance?.length
+        ? deepAIResult.actionableGuidance
+        : riskCalculation.actionableGuidance;
+
+      // Step 6: Construct Unified Result Object
       const resultObj: VerificationResult = {
         id: `analysis-${Date.now()}`,
         timestamp: new Date().toISOString(),
         inputType,
         originalInput: text,
-        extractedClaim: claim,
-        riskScore: riskCalculation.riskScore,
-        riskLevel: riskCalculation.riskLevel,
-        assessment: riskCalculation.assessment,
-        whyReasons: riskCalculation.whyReasons,
-        scoreComponents: riskCalculation.scoreComponents,
+        extractedClaim: deepAIResult?.extractedClaim || claim,
+        searchQuery,
+        riskScore: finalRiskScore,
+        riskLevel: finalLevel,
+        assessment: finalAssessment,
+        confidenceScore: deepAIResult?.confidenceScore || riskCalculation.confidenceScore,
+        credibilityRating: deepAIResult?.credibilityRating || riskCalculation.credibilityRating,
+        category: deepAIResult?.category || riskCalculation.category,
+        emotionalTone: deepAIResult?.emotionalTone || riskCalculation.emotionalTone,
+        urgencyLevel: deepAIResult?.urgencyLevel || riskCalculation.urgencyLevel,
+        whyReasons: finalReasons,
+        actionableGuidance: finalGuidance,
+        scoreComponents: deepAIResult?.scoreComponents || riskCalculation.scoreComponents,
         evidenceFound: evidenceResult.found,
         evidenceItems: evidenceResult.items,
         evidenceMessage: evidenceResult.message,
@@ -229,12 +269,12 @@ export default function App() {
         mediaDetails: extraData
       };
 
-      // Step 6: Generate Accessibility Speech Script
+      // Step 7: Generate Accessibility Speech Script
       resultObj.readAloudScript = buildReadAloudScript(resultObj);
 
       setCurrentResult(resultObj);
 
-      // Step 7: Record to Local History
+      // Step 8: Record to Local History
       const newHistoryEntry: HistoryEntry = {
         id: resultObj.id,
         timestamp: resultObj.timestamp,
@@ -242,7 +282,8 @@ export default function App() {
         claim: resultObj.extractedClaim,
         riskScore: resultObj.riskScore,
         riskLevel: resultObj.riskLevel,
-        assessment: resultObj.assessment
+        assessment: resultObj.assessment,
+        category: resultObj.category
       };
 
       setHistory(prev => [newHistoryEntry, ...prev]);

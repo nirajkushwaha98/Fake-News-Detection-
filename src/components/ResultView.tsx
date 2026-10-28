@@ -12,7 +12,10 @@ import {
   XCircle,
   Copy,
   Check,
-  RotateCcw
+  RotateCcw,
+  Tag,
+  Compass,
+  CheckCheck
 } from 'lucide-react';
 import { VerificationResult } from '../types';
 
@@ -36,7 +39,22 @@ export const ResultView: React.FC<ResultViewProps> = ({
   const [copied, setCopied] = React.useState(false);
 
   const handleCopySummary = () => {
-    const text = `[TruthLens AI Verification Report]\nAssessment: ${result.assessment}\nRisk Score: ${result.riskScore}/100 (${result.riskLevel} RISK)\nClaim: "${result.extractedClaim}"\nKey Reasons:\n${result.whyReasons.join('\n')}\nVerified via TruthLens AI`;
+    const text = `[TruthLens AI Verification Report]
+Category: ${result.category || 'General'}
+Assessment: ${result.assessment}
+Risk Score: ${result.riskScore}/100 (${result.riskLevel} RISK)
+Confidence: ${result.confidenceScore || 90}%
+Credibility: ${result.credibilityRating || ''}
+Tone: ${result.emotionalTone || 'Neutral'} | Urgency: ${result.urgencyLevel || 'NORMAL'}
+Claim: "${result.extractedClaim}"
+
+Key Findings:
+${result.whyReasons.map(r => `• ${r}`).join('\n')}
+
+Actionable Guidance:
+${(result.actionableGuidance || []).map(g => `• ${g}`).join('\n')}
+
+Verified via TruthLens AI Multimodal Screening`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -83,10 +101,15 @@ export const ResultView: React.FC<ResultViewProps> = ({
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-1">
             <span>TruthLens AI Analysis Report</span>
             <span>·</span>
             <span>Input: {result.inputType.toUpperCase()}</span>
+            <span>·</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-950/70 border border-cyan-800/60 text-cyan-300 text-[11px] lowercase">
+              <Tag className="w-3 h-3" />
+              {result.category || 'General'}
+            </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
             Screening & Verification Results
@@ -124,7 +147,7 @@ export const ResultView: React.FC<ResultViewProps> = ({
             type="button"
             onClick={handleCopySummary}
             className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-            title="Copy analysis summary"
+            title="Copy analysis report"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
           </button>
@@ -164,18 +187,39 @@ export const ResultView: React.FC<ResultViewProps> = ({
           </div>
 
           <div>
-            <div className="flex items-center gap-2 justify-center sm:justify-start">
+            <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
               <IconComponent className={`w-5 h-5 ${riskColor}`} />
               <span className={`text-xs font-black tracking-wider uppercase ${riskColor}`}>
                 {result.riskLevel} MISINFORMATION RISK
               </span>
+              {result.confidenceScore && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-semibold">
+                  {result.confidenceScore}% Confidence
+                </span>
+              )}
             </div>
             <div className="text-2xl sm:text-3xl font-black mt-1 tracking-tight">
               {result.assessment}
             </div>
-            <p className="text-xs text-slate-400 mt-1 max-w-md">
-              Score derived from composite weighted lexical, institutional citation, and external knowledge cross-checks.
+            <p className="text-xs text-slate-300 font-medium mt-1">
+              {result.credibilityRating || 'Multimodal verification across lexical, factual & source parameters.'}
             </p>
+
+            {/* Emotional Tone & Urgency Badges */}
+            <div className="flex flex-wrap items-center gap-2 mt-2 justify-center sm:justify-start">
+              <span className="text-[11px] px-2.5 py-1 rounded-md bg-slate-800/80 border border-slate-700 text-slate-300">
+                Tone: <strong className="text-slate-100">{result.emotionalTone || 'Neutral'}</strong>
+              </span>
+              <span className={`text-[11px] px-2.5 py-1 rounded-md border ${
+                result.urgencyLevel === 'CRITICAL'
+                  ? 'bg-rose-950/60 border-rose-800 text-rose-300'
+                  : result.urgencyLevel === 'MODERATE'
+                  ? 'bg-amber-950/60 border-amber-800 text-amber-300'
+                  : 'bg-slate-800/80 border-slate-700 text-slate-300'
+              }`}>
+                Urgency: <strong className="font-semibold">{result.urgencyLevel || 'NORMAL'}</strong>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -186,13 +230,20 @@ export const ResultView: React.FC<ResultViewProps> = ({
             <span className="text-amber-400">MED (31-60)</span>
             <span className="text-rose-400">HIGH (61-100)</span>
           </div>
-          <div className="w-full h-3 rounded-full bg-slate-950 overflow-hidden flex border border-slate-800">
+          <div className="w-full h-3 rounded-full bg-slate-950 overflow-hidden flex border border-slate-800 relative">
             <div className="w-[30%] bg-emerald-500/40 border-r border-slate-900" />
             <div className="w-[30%] bg-amber-500/40 border-r border-slate-900" />
             <div className="w-[40%] bg-rose-500/40" />
+            {/* Current score marker pointer */}
+            <div
+              className="absolute top-0 bottom-0 w-1.5 bg-white shadow-lg transform -translate-x-1/2"
+              style={{ left: `${Math.max(2, Math.min(98, result.riskScore))}%` }}
+              title={`Risk position: ${result.riskScore}%`}
+            />
           </div>
-          <div className="text-right text-[11px] text-slate-400">
-            Risk Position: <strong className={riskColor}>{result.riskScore}%</strong>
+          <div className="flex justify-between items-center text-[11px] text-slate-400">
+            <span>Score Position:</span>
+            <strong className={riskColor}>{result.riskScore} / 100</strong>
           </div>
         </div>
       </div>
@@ -203,16 +254,21 @@ export const ResultView: React.FC<ResultViewProps> = ({
           ? 'bg-black border-cyan-400'
           : 'bg-slate-950/80 border-slate-800'
       }`}>
-        <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-1.5 flex items-center gap-1.5">
-          <Search className="w-3.5 h-3.5" />
-          <span>Extracted Core Claim:</span>
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+            <Search className="w-3.5 h-3.5" />
+            <span>Extracted Core Claim:</span>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            Category: <span className="text-cyan-300 font-semibold">{result.category || 'General'}</span>
+          </span>
         </div>
         <blockquote className="text-base sm:text-lg font-medium italic text-slate-200 pl-3 border-l-2 border-cyan-500">
           &ldquo;{result.extractedClaim}&rdquo;
         </blockquote>
       </div>
 
-      {/* Why This Result? (Explainability Engine) */}
+      {/* Why This Result? (Explainable AI Breakdown) */}
       <div className="mb-6">
         <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
           <span>Why this result?</span>
@@ -221,37 +277,89 @@ export const ResultView: React.FC<ResultViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {result.whyReasons.map((reason, idx) => {
             const isWarning = reason.startsWith('⚠️');
+            const isSupport = reason.startsWith('✓');
             return (
               <div
                 key={idx}
                 className={`p-3.5 rounded-xl border text-xs sm:text-sm font-medium leading-relaxed flex items-start gap-2.5 ${
                   isWarning
                     ? 'bg-amber-950/25 border-amber-800/40 text-amber-200'
-                    : 'bg-emerald-950/25 border-emerald-800/40 text-emerald-200'
+                    : isSupport
+                    ? 'bg-emerald-950/25 border-emerald-800/40 text-emerald-200'
+                    : 'bg-slate-900/60 border-slate-800 text-slate-300'
                 }`}
               >
                 <span className="text-base shrink-0">
-                  {isWarning ? '⚠️' : '✓'}
+                  {isWarning ? '⚠️' : isSupport ? '✓' : 'ℹ️'}
                 </span>
-                <span>{reason.replace(/^[⚠️✓]\s*/, '')}</span>
+                <span>{reason.replace(/^[⚠️✓ℹ️]\s*/, '')}</span>
               </div>
             );
           })}
         </div>
       </div>
 
+      {/* Detected Linguistic Signals & Tokens */}
+      {(result.linguistic.sensationalKeywords.length > 0 ||
+        result.linguistic.suspiciousPhrases.length > 0 ||
+        result.linguistic.credibilityIndicators.length > 0 ||
+        result.linguistic.screamingCaps ||
+        result.linguistic.excessivePunctuation) && (
+        <div className="mb-6 p-4 rounded-xl border border-slate-800 bg-slate-950/50 space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <span>Detected Language & Style Markers:</span>
+          </h3>
+          <div className="flex flex-wrap gap-2 text-xs">
+            {result.linguistic.sensationalKeywords.map((kw, i) => (
+              <span key={`kw-${i}`} className="px-2.5 py-1 rounded-md bg-rose-950/50 border border-rose-800/60 text-rose-300 flex items-center gap-1">
+                <span>⚠️</span>
+                <span>{kw}</span>
+              </span>
+            ))}
+            {result.linguistic.suspiciousPhrases.map((phrase, i) => (
+              <span key={`ph-${i}`} className="px-2.5 py-1 rounded-md bg-amber-950/50 border border-amber-800/60 text-amber-300 flex items-center gap-1">
+                <span>🔁 Viral Phrase:</span>
+                <span>&ldquo;{phrase}&rdquo;</span>
+              </span>
+            ))}
+            {result.linguistic.credibilityIndicators.map((ci, i) => (
+              <span key={`ci-${i}`} className="px-2.5 py-1 rounded-md bg-emerald-950/50 border border-emerald-800/60 text-emerald-300 flex items-center gap-1">
+                <span>✓ Sourced Reference:</span>
+                <span>{ci}</span>
+              </span>
+            ))}
+            {result.linguistic.screamingCaps && (
+              <span className="px-2.5 py-1 rounded-md bg-purple-950/50 border border-purple-800/60 text-purple-300">
+                🔠 Uppercase Alarmism
+              </span>
+            )}
+            {result.linguistic.excessivePunctuation && (
+              <span className="px-2.5 py-1 rounded-md bg-purple-950/50 border border-purple-800/60 text-purple-300">
+                ‼️ Punctuation Spikes
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Score Breakdown (Transparent Weights) */}
       <div className="mb-6 p-5 rounded-xl border border-slate-800 bg-slate-950/50">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3">
-          Score Breakdown & Mathematical Weights (0–100 Scale)
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+            Score Breakdown & Mathematical Weights (0–100 Scale)
+          </h3>
+          <span className="text-[11px] text-slate-400">Total: 100% composite weighted</span>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
           <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
             <div className="text-xs text-slate-400">Text Signals</div>
             <div className="text-lg font-black text-cyan-400 mt-0.5">
               {result.scoreComponents.textSignals}%
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Weight: 30%</div>
+            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden mt-2">
+              <div className="bg-cyan-400 h-full" style={{ width: `${result.scoreComponents.textSignals}%` }} />
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1">Weight: 30%</div>
           </div>
 
           <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
@@ -259,7 +367,10 @@ export const ResultView: React.FC<ResultViewProps> = ({
             <div className="text-lg font-black text-blue-400 mt-0.5">
               {result.scoreComponents.evidence}%
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Weight: 30%</div>
+            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden mt-2">
+              <div className="bg-blue-400 h-full" style={{ width: `${result.scoreComponents.evidence}%` }} />
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1">Weight: 30%</div>
           </div>
 
           <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
@@ -267,7 +378,10 @@ export const ResultView: React.FC<ResultViewProps> = ({
             <div className="text-lg font-black text-amber-400 mt-0.5">
               {result.scoreComponents.languageIndicators}%
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Weight: 20%</div>
+            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden mt-2">
+              <div className="bg-amber-400 h-full" style={{ width: `${result.scoreComponents.languageIndicators}%` }} />
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1">Weight: 20%</div>
           </div>
 
           <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
@@ -275,12 +389,33 @@ export const ResultView: React.FC<ResultViewProps> = ({
             <div className="text-lg font-black text-indigo-400 mt-0.5">
               {result.scoreComponents.sourceContext}%
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Weight: 20%</div>
+            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden mt-2">
+              <div className="bg-indigo-400 h-full" style={{ width: `${result.scoreComponents.sourceContext}%` }} />
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1">Weight: 20%</div>
           </div>
         </div>
       </div>
 
-      {/* FIND RELATED / REAL NEWS SECTION */}
+      {/* Actionable Guidance Checklist */}
+      {result.actionableGuidance && result.actionableGuidance.length > 0 && (
+        <div className="mb-6 p-5 rounded-xl border border-slate-800 bg-slate-950/60">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-1.5">
+            <Compass className="w-4 h-4 text-cyan-400" />
+            <span>Recommended Action Steps for You:</span>
+          </h3>
+          <div className="space-y-2">
+            {result.actionableGuidance.map((step, idx) => (
+              <div key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-200">
+                <CheckCheck className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <span>{step}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* FIND RELATED / REAL EVIDENCE SECTION */}
       <div className="border-t border-slate-800 pt-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -290,7 +425,7 @@ export const ResultView: React.FC<ResultViewProps> = ({
             </h3>
           </div>
           <span className="text-xs text-slate-400">
-            Real Live Encyclopedic & Fact-Checking Cross-Check
+            Live Open Encyclopedic & Reference Cross-Check
           </span>
         </div>
 
@@ -335,9 +470,15 @@ export const ResultView: React.FC<ResultViewProps> = ({
                     </div>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-3">
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-2">
                     {item.summary}
                   </p>
+
+                  {item.stanceReason && (
+                    <div className="text-[11px] text-slate-400 italic mb-2">
+                      Stance Rationale: {item.stanceReason}
+                    </div>
+                  )}
 
                   <a
                     href={item.url}
@@ -353,7 +494,7 @@ export const ResultView: React.FC<ResultViewProps> = ({
             })}
           </div>
         ) : (
-          /* MANDATORY NO RELATED NEWS FOUND CARD */
+          /* MANDATORY NO RELATED EVIDENCE FOUND CARD */
           <div className="p-5 rounded-xl border border-amber-800/40 bg-amber-950/20 text-amber-200">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
@@ -365,7 +506,7 @@ export const ResultView: React.FC<ResultViewProps> = ({
                   &ldquo;Not finding evidence does not by itself prove that the claim is false.&rdquo;
                 </p>
                 <p className="text-slate-400 text-xs">
-                  The claim may concern an emerging local event, an unindexed rumor, or an offline incident without established journalistic documentation.
+                  The claim may concern an emerging hyper-local event, a private communication, or an unindexed rumor without established journalistic documentation.
                 </p>
               </div>
             </div>

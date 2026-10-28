@@ -24,23 +24,29 @@ export interface EvidenceItem {
   url: string;
   stance: Stance;
   stanceLabel: string;
+  stanceReason?: string;
   relevanceScore?: number;
 }
 
 export interface ScoreComponents {
-  textSignals: number;      // 30% weight
-  evidence: number;         // 30% weight
+  textSignals: number;        // 30% weight
+  evidence: number;           // 30% weight
   languageIndicators: number; // 20% weight
-  sourceContext: number;    // 20% weight
+  sourceContext: number;      // 20% weight
 }
 
 export interface LinguisticAnalysis {
   sensationalScore: number;
+  urgencyScore: number;
+  urgencyLevel: string;
+  emotionalTone: string;
   excessivePunctuation: boolean;
   screamingCaps: boolean;
+  absoluteClaims: boolean;
   suspiciousPhrases: string[];
   sensationalKeywords: string[];
   credibilityIndicators: string[];
+  category: string;
   wordCount: number;
   readingEase?: number;
 }
@@ -51,10 +57,17 @@ export interface VerificationResult {
   inputType: InputMode;
   originalInput: string;
   extractedClaim: string;
-  riskScore: number;         // 0 - 100
-  riskLevel: RiskLevel;      // LOW (0-30), MEDIUM (31-60), HIGH (61-100)
+  searchQuery?: string;
+  riskScore: number;           // 0 - 100
+  riskLevel: RiskLevel;        // LOW (0-30), MEDIUM (31-60), HIGH (61-100)
   assessment: AssessmentTier;
+  confidenceScore: number;     // 0 - 100
+  credibilityRating: string;
+  category: string;
+  emotionalTone: string;
+  urgencyLevel: string;
   whyReasons: string[];
+  actionableGuidance: string[];
   scoreComponents: ScoreComponents;
   evidenceFound: boolean;
   evidenceItems: EvidenceItem[];
@@ -77,6 +90,7 @@ export interface HistoryEntry {
   riskScore: number;
   riskLevel: RiskLevel;
   assessment: AssessmentTier;
+  category?: string;
 }
 
 export interface PresetSample {

@@ -1,0 +1,8 @@
+{
+  "model_type": "LogisticRegression + TF-IDF (1-2 ngrams)",
+  "accuracy": 0.9091,
+  "precision": 0.8333,
+  "recall": 1.0,
+  "f1_score": 0.9091,
+  "sample_count": 43
+}

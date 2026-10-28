@@ -25,6 +25,21 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/<\/?[^>]+(>|$)/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Live Evidence Search Proxy (Wikipedia API for grounded, real citations)
 app.get('/api/evidence', async (req, res) => {
   try {
@@ -36,7 +51,11 @@ app.get('/api/evidence', async (req, res) => {
     const cleanQuery = encodeURIComponent(query.trim().slice(0, 150));
     const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${cleanQuery}&utf8=&format=json&origin=*`;
     
-    const response = await fetch(wikiUrl);
+    const response = await fetch(wikiUrl, {
+      headers: {
+        'User-Agent': 'TruthLensAI-MisinformationScreening/2.0'
+      }
+    });
     if (!response.ok) {
       throw new Error(`Wikipedia API responded with status ${response.status}`);
     }
@@ -45,14 +64,12 @@ app.get('/api/evidence', async (req, res) => {
     const searchResults = data?.query?.search || [];
 
     const evidenceItems = searchResults.slice(0, 4).map((item: any) => {
-      // Strip HTML tags from snippet
-      const cleanSnippet = item.snippet
-        ? item.snippet.replace(/<\/?[^>]+(>|$)/g, '')
-        : 'Encyclopedic record available for cross-referencing.';
+      const cleanSnippet = decodeHtmlEntities(item.snippet || 'Encyclopedic record available for cross-referencing.');
+      const cleanTitle = decodeHtmlEntities(item.title || 'Related Reference');
 
       return {
         id: `wiki-${item.pageid}`,
-        title: item.title,
+        title: cleanTitle,
         source: 'Wikipedia Encyclopedic Database',
         summary: cleanSnippet,
         url: `https://en.wikipedia.org/?curid=${item.pageid}`,
@@ -104,14 +121,24 @@ Return a valid JSON object ONLY with the following structure:
   "extractedClaim": "Concise summary of the core falsifiable claim",
   "assessment": "Potentially Reliable" OR "Potentially Misleading" OR "High Misinformation Risk",
   "riskScore": number between 0 and 100,
+  "confidenceScore": number between 60 and 99,
+  "credibilityRating": "High Credibility" OR "Moderate Credibility" OR "Low Credibility",
+  "category": "Health & Medical" OR "Science & Technology" OR "Governance & Policy" OR "Financial & Economy" OR "Viral Hoax & Rumor" OR "General News",
+  "emotionalTone": "Objective & Sourced" OR "Neutral / Informative" OR "Alarmist / Clickbait" OR "Conspiratorial",
+  "urgencyLevel": "LOW" OR "NORMAL" OR "MODERATE" OR "CRITICAL",
   "reasons": ["List 2-4 specific objective reasons for this assessment"],
+  "actionableGuidance": ["List 2 concrete recommendations for what the user should do"],
   "sensationalKeywords": ["List any sensational or emotionally charged keywords detected"],
-  "factualConsistency": "High" OR "Moderate" OR "Low" OR "Unverified",
-  "suggestedVerificationSteps": ["1-2 steps a user can take to verify"]
+  "scoreComponents": {
+    "textSignals": number between 0 and 100,
+    "evidence": number between 0 and 100,
+    "languageIndicators": number between 0 and 100,
+    "sourceContext": number between 0 and 100
+  }
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json'
